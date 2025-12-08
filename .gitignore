@@ -1,0 +1,10 @@
+gitignore
+
+# Virtual environment
+env/
+
+# API keys and secrets
+config.py
+
+# Data
+.DS_Store
