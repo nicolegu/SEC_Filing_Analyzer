@@ -69,57 +69,66 @@ def extract_section(html_path, section_name='Item 1A', debug = True):
             print(f"Could not find parent div")
         return None
     
-    if debug:
-        siblings = list(header_div.find_next_siblings('div'))
-        print(f"Found {len(siblings)} sibling divs")
-        if siblings:
-            print(f"First sibling: {siblings[0].get_text()[:10]}")
-   
-    if len(siblings) == 0:
-        column_div = header_div.find_parent('div')
-        if column_div:
-            all_divs = column_div.find_all('div', recursive=False)
-            header_idx = None
-            for i, div in enumerate(all_divs):
-                if div == header_div:
-                    header_idx = i
-                    break
-            
-            if header_idx is not None:
-                siblings = all_divs[header_idx + 1:]
-
-        if debug:
-            print(f"After going up one level: found {len(siblings)} siblings")
-
-    # Collect text from all sibling divs until next major section
-    next_section_pattern = re.compile(r'Item\s*1B|Item\s*[2-9]\w*\.', re.IGNORECASE)
+    next_section_pattern = re.compile(r'Item\s*1[B-Z]|Item\s*[2-9]', re.IGNORECASE)
     text_content = []
 
-    # Traverse sibling divs after the header
-    for sibling in siblings:
-        # Check if this div contains a new Item header (stop condition)
-        bold_spans = sibling.find_all('span', style=re.compile(r'font-weight:\s*700'))
-        
-        should_stop = False
-        for span in bold_spans:
-            span_text = span.get_text(strip = True)
-            if next_section_pattern.search(span_text):
-                should_stop = True
-                break
-        
-        if should_stop:
-            break
+    search_div = header_div
 
-        # Extract text from this div
-        text = sibling.get_text(separator=' ', strip=True)
-        if text:
-            text_content.append(text)
+    for level in range(3):
+        if debug:
+            print(f"\nTrying level {level}...")
+    
+        siblings = []
+        for sibling in search_div.find_next_siblings('div'):
+            text = sibling.get_text(separator = ' ', strip = True)
+            if text:
+                siblings.append(sibling)
+        
+        if debug:
+            print(f"Found {len(siblings)} sibling divs")
+            if siblings:
+                print(f"First sibling preview: {siblings[0].get_text()[:100]}")
+        
+        if siblings:
+            for sibling in siblings:
+                bold_spans = sibling.find_all('span', style = re.compile(r'font-weight:\s*700'))
+
+                should_stop = False
+                for span in bold_spans:
+                    span_text = span.get_text(strip = True)
+                    if next_section_pattern.search(span_text):
+                        should_stop = True
+                        if debug:
+                            print(f"Stopped at: {span_text}")
+                        break
+
+                if should_stop:
+                    break
+
+                # Extract text
+                text = sibling.get_text(separator = ' ', strip = True)
+                if text:
+                    text_content.append(text)
+
+            if text_content:
+                break
+
+        parent = search_div.find_parent('div')
+        if not parent:
+            if debug:
+                print("No more parent levels")
+            break
+        search_div = parent
 
     if debug:
-        print(f"Collected {len(text_content)} text blocks")
+        print(f"\n Collected {len(text_content)} text blocks")
+        if text_content:
+            print(f"First block preview: {text_content[0][:100]}")
 
     result = '\n\n'.join(text_content)
     return result if result else None
+
+
 
 html_file = 'sec-edgar-filings/GS/10-K/0000886982-23-000003/extracted-10k.html'
 
@@ -129,7 +138,5 @@ risk_factors = extract_section(html_file, debug=True)
 
 if risk_factors:
     print(f'\n=== Extracted Risk Factors ===')
+    print(f"Total length: {len(risk_factors)} characters")
     print(risk_factors[:500])
-
-
-
